@@ -1,11 +1,10 @@
 #!/usr/bin/bash
 
 # CS 2080 Lab 8 - Migration Validator
-# Run this script from the Lab 8 workspace after migrate_all.sh.
-# Expected migrated files:
-#   migrated/prod.conf
-#   migrated/staging.conf
-#   migrated/backup.conf
+# Run after executing scripts/migrate_all.sh.
+
+lab_dir="$HOME/CS2080_Lab8"
+migrated_dir="$lab_dir/migrated"
 
 passed=0
 failed=0
@@ -49,36 +48,47 @@ check_absent() {
 echo "===== CS 2080 Lab 8 Migration Validation ====="
 echo
 
-for file in prod.conf staging.conf backup.conf
+# --------------------------------------------------
+# Check that final migrated files exist
+# --------------------------------------------------
+
+for file in prod_migrated.conf staging_migrated.conf backup_migrated.conf
 do
-    path="migrated/$file"
+    path="$migrated_dir/$file"
+
     if [ -f "$path" ]
     then
-        pass "$path exists"
+        pass "$file exists"
     else
-        fail "$path exists"
+        fail "$file exists"
     fi
 done
 
 echo
 
-# Stop detailed checks for a file if it does not exist.
-for file in prod.conf staging.conf backup.conf
+# --------------------------------------------------
+# Check common migration requirements
+# --------------------------------------------------
+
+for file in prod_migrated.conf staging_migrated.conf backup_migrated.conf
 do
-    path="migrated/$file"
+    path="$migrated_dir/$file"
 
     if [ ! -f "$path" ]
     then
         continue
     fi
 
-    echo "--- Checking $path ---"
+    echo "--- Checking $file ---"
 
     check_present "$path" "SERVICE_USER=appsvc" \
         "$file: SERVICE_USER changed to appsvc"
 
-    check_absent "$path" "SERVICE_USER=legacyuser" \
-        "$file: legacy SERVICE_USER removed"
+    check_absent "$path" "legacyuser" \
+        "$file: legacy username removed"
+
+    check_absent "$path" "legacyapp" \
+        "$file: legacy application path removed"
 
     check_present "$path" "# Managed by CS2080 migration" \
         "$file: management comment inserted"
@@ -90,7 +100,7 @@ do
         "$file: LEGACY_MODE removed"
 
     check_present "$path" "HEALTH_CHECK=enabled" \
-        "$file: HEALTH_CHECK appended"
+        "$file: HEALTH_CHECK added"
 
     check_present "$path" "TLS=Y" \
         "$file: TLS flag changed to Y"
@@ -101,21 +111,21 @@ do
     echo
 done
 
-# Environment-specific hostname/IP checks.
-if [ -f migrated/prod.conf ]; then
-    check_present migrated/prod.conf "NODE_ADDRESS=prod-app-01:10.20.1.25" \
-        "prod.conf: prod-app-01 IP changed to 10.20.1.25"
-fi
+# --------------------------------------------------
+# Check environment-specific IP migrations
+# --------------------------------------------------
 
-if [ -f migrated/staging.conf ]; then
-    check_present migrated/staging.conf "NODE_ADDRESS=stage-app-01:10.20.2.25" \
-        "staging.conf: stage-app-01 IP changed to 10.20.2.25"
-fi
+check_present "$migrated_dir/prod_migrated.conf" \
+    "NODE_ADDRESS=prod-app-01:10.20.1.25" \
+    "prod_migrated.conf: prod-app-01 IP changed to 10.20.1.25"
 
-if [ -f migrated/backup.conf ]; then
-    check_present migrated/backup.conf "NODE_ADDRESS=dr-app-01:10.20.3.25" \
-        "backup.conf: dr-app-01 IP changed to 10.20.3.25"
-fi
+check_present "$migrated_dir/staging_migrated.conf" \
+    "NODE_ADDRESS=stage-app-01:10.20.2.25" \
+    "staging_migrated.conf: stage-app-01 IP changed to 10.20.2.25"
+
+check_present "$migrated_dir/backup_migrated.conf" \
+    "NODE_ADDRESS=dr-app-01:10.20.3.25" \
+    "backup_migrated.conf: dr-app-01 IP changed to 10.20.3.25"
 
 echo
 echo "===== Validation Summary ====="
@@ -130,6 +140,6 @@ then
 else
     echo
     echo "LAB VALIDATION FAILED"
-    echo "Review the [FAIL] lines, correct your sed rules, and run the validator again."
+    echo "Review the [FAIL] lines, correct your migration, and run the validator again."
     exit 1
 fi
